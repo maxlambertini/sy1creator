@@ -129,7 +129,7 @@ var con = []string{"b", "c", "d", "f", "g", "k", "l", "m", "n", "p", "r", "s", "
 func GetColor() string { return "color=" + colors[rand.Intn(len(colors))] }
 
 // GetVer ...
-func GetVer() string { return "ver=108" }
+func GetVer() string { return "ver=113" }
 
 // Word ...
 func Word() string {
@@ -175,7 +175,7 @@ func InitSyParam(_index int, _vmin int, _vmax int, _desc string) *SyParam {
 }
 
 // RandomizeParam ...
-func (p SyParam) RandomizeParam(genetic bool) {
+func (p *SyParam) RandomizeParam(genetic bool) {
 	switch p.index {
 	case 9:
 		p.current = 0
@@ -196,13 +196,13 @@ func (p SyParam) RandomizeParam(genetic bool) {
 }
 
 // ParamString ...
-func (p SyParam) ParamString() (res string) {
+func (p *SyParam) ParamString() (res string) {
 	res = fmt.Sprintf("%d,%d", p.index, p.current)
 	return
 }
 
 // Deviation ...
-func (p SyParam) Deviation(percentage float32, genetic bool) {
+func (p *SyParam) Deviation(percentage float32, genetic bool) {
 	switch p.index {
 	case 9:
 		p.current = 0
@@ -267,14 +267,17 @@ func InitSyPatch(filename string) *SyPatch {
 }
 
 // GenerateRandomPatch ...
-func (p SyPatch) GenerateRandomPatch() {
+func (p *SyPatch) GenerateRandomPatch() {
 	for _, v := range p.Params {
+		//v1 := v.current
 		v.RandomizeParam(p.Genetic)
+		//v2 := v.current
+		//fmt.Println("Patch ", p.Description, " param ", v.Description, "Orig val=", v1, " ch val=", v2)
 	}
 }
 
 // CopyPatchValues copies the values of a Patch to another Patch
-func (p SyPatch) CopyPatchValues(pDest *SyPatch) {
+func (p *SyPatch) CopyPatchValues(pDest *SyPatch) {
 	for k, v := range p.Params {
 		_, ok := pDest.Params[k]
 		if ok {
@@ -285,9 +288,9 @@ func (p SyPatch) CopyPatchValues(pDest *SyPatch) {
 }
 
 // GenerateParametricPatch ...
-func (p SyPatch) GenerateParametricPatch() {
+func (p *SyPatch) GenerateParametricPatch() {
 	if p.Impact > 0 {
-		s := make([]int, 10)
+		var s []int
 		for k := range p.Params {
 			s = append(s, k)
 		}
@@ -308,18 +311,22 @@ func (p SyPatch) GenerateParametricPatch() {
 }
 
 // GeneratePatchText ...
-func (p SyPatch) GeneratePatchText() string {
+func (p *SyPatch) GeneratePatchText() string {
 	newLine := "\r\n"
 	sbuf := p.Description + newLine + p.Color + newLine + p.Version + newLine
-	for _, v := range p.Params {
-		sbuf = sbuf + v.ParamString() + newLine
+	for h := 0; h < len(CorrectSequence); h++ {
+		k := CorrectSequence[h]
+		v, ok := p.Params[k]
+		if ok {
+			sbuf = sbuf + v.ParamString() + newLine
+		}
 	}
 	return sbuf
 }
 
 // GetPatchFileName ...
 func GetPatchFileName(i int) string {
-	return fmt.Sprintf("%03d.sy", i)
+	return fmt.Sprintf("%03d.sy1", i)
 }
 
 func checkFileErr(e error) {
@@ -329,9 +336,9 @@ func checkFileErr(e error) {
 }
 
 // GeneratePatchFile ...
-func (p SyPatch) GeneratePatchFile(index int) string {
+func (p *SyPatch) GeneratePatchFile(index int) string {
 	fp := GetPatchFileName(index)
-	fullPath := p.Directory + fp
+	fullPath := p.Directory + string(os.PathSeparator) + fp
 	pt := p.GeneratePatchText()
 	err := ioutil.WriteFile(fullPath, []byte(pt), 0644)
 	checkFileErr(err)
@@ -375,8 +382,8 @@ func InitNewPatchset(filename string) *SyPatchset {
 }
 
 // CreateMorphing ...
-func (p SyPatchset) CreateMorphing(steps int) {
-	s := make([]int, 10)
+func (p *SyPatchset) CreateMorphing(steps int) {
+	var s []int
 	dict := make(map[int]float32)
 	var flVal float32
 	var curDif float32
@@ -408,7 +415,7 @@ func (p SyPatchset) CreateMorphing(steps int) {
 }
 
 // UpdateValues ...
-func (p SyPatchset) UpdateValues() {
+func (p *SyPatchset) UpdateValues() {
 	for _, pa := range p.Patches {
 		pa.Directory = p.Directory
 		pa.Percentage = p.Percentage
@@ -419,7 +426,7 @@ func (p SyPatchset) UpdateValues() {
 }
 
 // GeneratePatches ...
-func (p SyPatchset) GeneratePatches() {
+func (p *SyPatchset) GeneratePatches() {
 	for _, patch := range p.Patches {
 		if p.FullRandom {
 			patch.GenerateRandomPatch()
@@ -431,26 +438,31 @@ func (p SyPatchset) GeneratePatches() {
 }
 
 // GenerateZip ...
-func (p SyPatchset) GenerateZip(filename string) {
+func (p *SyPatchset) GenerateZip(filename string) []string {
 	zip := new(archivex.ZipFile)
-	zipFileName := p.Directory + "/" + filename
+	defer zip.Close()
+	zipFileName := p.Directory + string(os.PathSeparator) + filename
 	zip.Create(zipFileName)
-	filesToDelete := make([]string, 60)
+	var filesToDelete []string
 	for h, patch := range p.Patches {
-		fp := patch.GeneratePatchFile(h)
-		zip.AddFile(p.Directory + "/" + fp)
-		filesToDelete = append(filesToDelete, p.Directory+"/"+fp)
+		fp := patch.GeneratePatchFile(1 + h)
+		zip.AddFile(fp)
+		filesToDelete = append(filesToDelete, p.Directory+string(os.PathSeparator)+fp)
 	}
 	// deleting file
+	return filesToDelete
+}
+
+// DeleteTempSyFiles ...
+func (p *SyPatchset) DeleteTempSyFiles(filesToDelete []string) {
 	for _, f2d := range filesToDelete {
-		fmt.Println("Removing ", f2d)
+		//fmt.Println("Removing ", f2d)
 		err := os.Remove(f2d)
 		if err != nil {
 			fmt.Println("Error deleting file ", f2d, ". Error: ", err)
 		}
 
 	}
-	zip.Close()
 }
 
 // ---------------------------------- helper methods --------------------------
@@ -468,6 +480,107 @@ func readLines(path string) ([]string, error) {
 		lines = append(lines, scanner.Text())
 	}
 	return lines, scanner.Err()
+}
+
+var CorrectSequence = []int{0,
+	45,
+	76,
+	1,
+	2,
+	3,
+	4,
+	5,
+	6,
+	7,
+	8,
+	9,
+	10,
+	11,
+	12,
+	13,
+	71,
+	72,
+	91,
+	95,
+	96,
+	97,
+	14,
+	15,
+	16,
+	17,
+	18,
+	19,
+	20,
+	21,
+	22,
+	23,
+	24,
+	25,
+	26,
+	27,
+	28,
+	29,
+	30,
+	59,
+	31,
+	32,
+	33,
+	34,
+	65,
+	82,
+	35,
+	83,
+	36,
+	98,
+	37,
+	66,
+	64,
+	52,
+	53,
+	54,
+	55,
+	56,
+	60,
+	61,
+	62,
+	63,
+	90,
+	77,
+	78,
+	79,
+	80,
+	81,
+	38,
+	94,
+	39,
+	74,
+	73,
+	93,
+	75,
+	84,
+	85,
+	92,
+	40,
+	86,
+	50,
+	87,
+	88,
+	51,
+	89,
+	57,
+	41,
+	42,
+	43,
+	44,
+	67,
+	68,
+	58,
+	46,
+	47,
+	48,
+	49,
+	69,
+	70,
 }
 
 func initWithDefaultParams(filename string) (result map[int]*SyParam) {
@@ -560,6 +673,16 @@ func initWithDefaultParams(filename string) (result map[int]*SyParam) {
 	dict[49] = InitSyParam(49, 0, 127, "AMOUNT")
 	dict[69] = InitSyParam(69, 0, 1, "TEMPO SYNC")
 	dict[70] = InitSyParam(70, 0, 1, "KEY SYNC")
+	dict[91] = InitSyParam(91, 0, 0, "AA")
+	dict[95] = InitSyParam(94, 1, 16, "FF")
+	dict[96] = InitSyParam(93, 1, 2, "XX")
+	dict[95] = InitSyParam(95, 0, 0, "BB")
+	dict[96] = InitSyParam(96, 1, 1, "CC")
+	dict[97] = InitSyParam(97, 1, 1, "DD")
+	dict[98] = InitSyParam(97, 1, 64, "EE")
+	dict[98] = InitSyParam(92, 0, 1, "WW")
+	dict[86] = InitSyParam(86, 45057, 45057, "E1E")
+	dict[88] = InitSyParam(88, 45057, 45057, "W1W")
 
 	if filename != "" {
 		fmt.Println("Initializing with ", filename)
@@ -567,7 +690,7 @@ func initWithDefaultParams(filename string) (result map[int]*SyParam) {
 		if err != nil {
 			syData := sylines[3:]
 			for _, line := range syData {
-				fmt.Println(line)
+				//fmt.Println(line)
 				line = strings.TrimSpace(line)
 				tokens := strings.Split(line, ",")
 				if len(tokens) > 0 {
