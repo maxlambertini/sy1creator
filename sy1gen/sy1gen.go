@@ -23,6 +23,7 @@ func main() {
 	var impactPtr int
 	var namePtr string
 	var usagePtr bool
+	var baseFileNamePtr string
 
 	flag.StringVar(&dirPtr, "directory", ".", "Output path")
 	flag.StringVar(&dirPtr, "d", ".", "Output path (shorthand)")
@@ -35,7 +36,7 @@ func main() {
 	flag.IntVar(&impactPtr, "impact", -1, "Number of parameter to change -1 all, max 80")
 	flag.IntVar(&impactPtr, "i", -1, "Number of parameter to change -1 all, max 80 (shorthand)")
 	flag.StringVar(&namePtr, "name", sy1go.Word(), "Define name of patchset")
-	flag.StringVar(&namePtr, "n", sy1go.Word(), "Define name of patchset (shorthand)")
+	flag.StringVar(&baseFileNamePtr, "filename", "", "Start generation using this base patch")
 	flag.BoolVar(&usagePtr, "h", false, "Show help message (shorthand)")
 	flag.BoolVar(&usagePtr, "help", false, "Show help message")
 
@@ -43,7 +44,7 @@ func main() {
 
 	if !usagePtr {
 
-		p = sy1go.InitNewPatchset("")
+		p = sy1go.InitNewPatchset(baseFileNamePtr)
 
 		defer func() {
 			fmt.Println("Deleting temp files")

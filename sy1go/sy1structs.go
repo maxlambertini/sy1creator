@@ -468,6 +468,7 @@ func (p *SyPatchset) DeleteTempSyFiles(filesToDelete []string) {
 // ---------------------------------- helper methods --------------------------
 
 func readLines(path string) ([]string, error) {
+	fmt.Println("Opening ", path)
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -687,13 +688,15 @@ func initWithDefaultParams(filename string) (result map[int]*SyParam) {
 	if filename != "" {
 		fmt.Println("Initializing with ", filename)
 		sylines, err := readLines(filename)
-		if err != nil {
+		if err == nil {
+			//if err != nil {
 			syData := sylines[3:]
 			for _, line := range syData {
 				//fmt.Println(line)
 				line = strings.TrimSpace(line)
 				tokens := strings.Split(line, ",")
 				if len(tokens) > 0 {
+					//fmt.Println("line: ", line, "tokens: ", tokens)
 					iKey, err := strconv.Atoi(tokens[0])
 					if err == nil {
 						iVal, err := strconv.Atoi(tokens[1])
@@ -708,6 +711,8 @@ func initWithDefaultParams(filename string) (result map[int]*SyParam) {
 
 				}
 			}
+		} else {
+			fmt.Println("Error reading patch file ", err)
 		}
 	} else {
 		sylines := strings.Split(DEFAULTDATA, "\n")
